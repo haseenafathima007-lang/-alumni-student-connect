@@ -23,6 +23,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const { notFound } = require("./middleware/notFoundMiddleware");
 const { errorHandler } = require("./middleware/errorMiddleware");
 const emailService = require("./services/emailService");
+const { corsOptions } = require("./config/cors");
 
 // Load environment variables
 dotenv.config();
@@ -36,10 +37,7 @@ const PORT = process.env.PORT || 5000;
 
 // Socket.IO configuration
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  },
+  cors: corsOptions,
 });
 
 io.on("connection", (socket) => {
@@ -86,13 +84,7 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
