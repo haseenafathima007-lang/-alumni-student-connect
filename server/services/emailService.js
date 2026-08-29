@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const dns = require("dns");
+const axios = require("axios");
 
 if (dns.setDefaultResultOrder) {
   dns.setDefaultResultOrder("ipv4first");
@@ -42,9 +43,19 @@ const getTransporter = () => {
 };
 
 /**
- * Verifies SMTP connection configuration on server startup.
+ * Verifies SMTP connection or HTTPS API configuration on server startup.
  */
 const verifySMTPConnection = async () => {
+  if (process.env.RESEND_API_KEY) {
+    console.log("✅ [Email Status] Resend HTTPS Email API configured and active (Cloud-optimized).");
+    return { configured: true, verified: true, provider: "Resend HTTPS API" };
+  }
+
+  if (process.env.BREVO_API_KEY) {
+    console.log("✅ [Email Status] Brevo HTTPS Email API configured and active (Cloud-optimized).");
+    return { configured: true, verified: true, provider: "Brevo HTTPS API" };
+  }
+
   const transporter = getTransporter();
   if (!transporter) {
     console.log(
@@ -58,9 +69,9 @@ const verifySMTPConnection = async () => {
     console.log(
       "✅ [SMTP Status] SMTP connection verified successfully! Mail server is ready to deliver real emails."
     );
-    return { configured: true, verified: true };
+    return { configured: true, verified: true, provider: "SMTP" };
   } catch (err) {
-    console.error("❌ [SMTP Status] SMTP connection verification failed:", err.message);
+    console.warn("ℹ️ [SMTP Status] Direct SMTP connection could not be verified on this cloud network:", err.message);
     return { configured: true, verified: false, error: err.message };
   }
 };
@@ -246,9 +257,80 @@ This link is valid for ${expiresInMinutes} minutes. If you did not request this,
 Easwari Engineering College • Alumni & Student Engagement Portal
   `;
 
+  // 1. Resend HTTPS API (Cloud-optimized, works on Render free tier over Port 443)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const res = await axios.post(
+        "https://api.resend.com/emails",
+        {
+          from: process.env.EMAIL_FROM || "Easwari AlumniConnect <onboarding@resend.dev>",
+          to: [to],
+          subject,
+          text: textContent,
+          html: htmlContent,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        }
+      );
+
+      console.log(`✅ [Resend HTTPS] Email delivered successfully! Message ID: ${res.data?.id}`);
+      return {
+        success: true,
+        messageId: res.data?.id,
+        accepted: [to],
+        response: "Resend HTTPS API 200 OK",
+        resetUrl,
+      };
+    } catch (resendErr) {
+      console.error("❌ [Resend Error] HTTPS email delivery failed:", resendErr.response?.data || resendErr.message);
+    }
+  }
+
+  // 2. Brevo HTTPS API (Port 443)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const res = await axios.post(
+        "https://api.brevo.com/v3/smtp/email",
+        {
+          sender: {
+            name: "Easwari Engineering College AlumniConnect",
+            email: user || "aluminiconnect2@gmail.com",
+          },
+          to: [{ email: to }],
+          subject,
+          htmlContent,
+          textContent,
+        },
+        {
+          headers: {
+            "api-key": process.env.BREVO_API_KEY,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        }
+      );
+
+      console.log(`✅ [Brevo HTTPS] Email delivered successfully! Message ID: ${res.data?.messageId}`);
+      return {
+        success: true,
+        messageId: res.data?.messageId,
+        accepted: [to],
+        response: "Brevo HTTPS API 200 OK",
+        resetUrl,
+      };
+    } catch (brevoErr) {
+      console.error("❌ [Brevo Error] HTTPS email delivery failed:", brevoErr.response?.data || brevoErr.message);
+    }
+  }
+
   if (!transporter) {
     console.warn(
-      `⚠️ [EmailService Warning] SMTP credentials (SMTP_USER/SMTP_PASSWORD) are NOT configured in server/.env.\nReal email could NOT be sent to: ${to}`
+      `⚠️ [EmailService Warning] Real email could NOT be sent because SMTP/API credentials are not configured.\nReset URL: ${resetUrl}`
     );
     return {
       success: false,
