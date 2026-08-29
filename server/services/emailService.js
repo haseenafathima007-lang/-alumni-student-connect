@@ -1,4 +1,9 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
+
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder("ipv4first");
+}
 
 /**
  * Creates and returns a Nodemailer transporter using environment variables.
@@ -26,6 +31,7 @@ const getTransporter = () => {
       user,
       pass,
     },
+    family: 4, // Force IPv4 to resolve ENETUNREACH on Render/cloud instances without IPv6
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,
