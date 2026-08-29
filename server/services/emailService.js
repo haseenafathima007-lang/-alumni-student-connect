@@ -6,8 +6,6 @@ const nodemailer = require("nodemailer");
  */
 const getTransporter = () => {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.SMTP_PORT, 10) || 587;
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
   const user = (process.env.SMTP_USER || process.env.EMAIL_USER || "").trim();
   const rawPass = process.env.SMTP_PASSWORD || process.env.SMTP_PASS || process.env.EMAIL_PASS || "";
   const pass = rawPass.replace(/\s+/g, "");
@@ -17,24 +15,13 @@ const getTransporter = () => {
   }
 
   const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
-
-  if (isGmail) {
-    return nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user,
-        pass,
-      },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
-    });
-  }
+  const port = parseInt(process.env.SMTP_PORT, 10) || (isGmail ? 465 : 587);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465 || isGmail;
 
   return nodemailer.createTransport({
-    host,
-    port,
-    secure,
+    host: isGmail ? "smtp.gmail.com" : host,
+    port: isGmail ? 465 : port,
+    secure: isGmail ? true : secure,
     auth: {
       user,
       pass,
@@ -84,10 +71,11 @@ const verifySMTPConnection = async () => {
  */
 const sendPasswordResetEmail = async ({ to, name, resetUrl, expiresInMinutes = 30 }) => {
   const transporter = getTransporter();
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.SMTP_PORT, 10) || 587;
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
   const user = (process.env.SMTP_USER || process.env.EMAIL_USER || "").trim();
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
+  const port = parseInt(process.env.SMTP_PORT, 10) || (isGmail ? 465 : 587);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465 || isGmail;
 
   const fromAddress = user
     ? `"Easwari Engineering College AlumniConnect" <${user}>`
