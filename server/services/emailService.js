@@ -16,6 +16,21 @@ const getTransporter = () => {
     return null;
   }
 
+  const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
+
+  if (isGmail) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user,
+        pass,
+      },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
+    });
+  }
+
   return nodemailer.createTransport({
     host,
     port,
@@ -24,6 +39,9 @@ const getTransporter = () => {
       user,
       pass,
     },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
     tls: {
       rejectUnauthorized: false,
     },
